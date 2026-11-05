@@ -11,7 +11,11 @@
     "write_actions_max": 0,
     "mcp_calls_max": 0,
     "external_actions_max": 0,
-    "expected_output_sentences": 5
+    "expected_output_sentences": 5,
+    "error_response_markers": [
+      "could not access the selected document",
+      "does not contain enough readable content"
+    ]
   },
 
   "allowed_capabilities": [
