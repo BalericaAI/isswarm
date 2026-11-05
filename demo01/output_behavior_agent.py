@@ -180,8 +180,15 @@ def build_output_behavior_evidence(
         output.sentence_count
     )
 
+    # The behavioral contract may declare explicit error-response
+    # phrases that are exempt from the sentence-count rule.
+    declared_error_response = (
+        output.matches_declared_error_response
+    )
+
     sentence_count_matches = (
         expected_sentence_count is None
+        or declared_error_response
         or observed_sentence_count
         == expected_sentence_count
     )
@@ -189,11 +196,17 @@ def build_output_behavior_evidence(
     output_contract_violated = (
         expected_sentence_count is not None
         and observed_sentence_count is not None
+        and not declared_error_response
         and observed_sentence_count
         != expected_sentence_count
     )
 
     evidence_warnings: list[str] = []
+
+    if declared_error_response:
+        evidence_warnings.append(
+            "DECLARED_ERROR_RESPONSE"
+        )
 
     if output.contains_possible_secret:
         evidence_warnings.append(
@@ -230,6 +243,10 @@ def build_output_behavior_evidence(
 
         "sentence_count_matches": (
             sentence_count_matches
+        ),
+
+        "declared_error_response": (
+            declared_error_response
         ),
 
         "output_contract_violated": (
@@ -409,6 +426,15 @@ If observed sentence count matches the expected count, this portion of
 the contract is satisfied.
 
 If the count differs, record an output-contract deviation.
+
+EXCEPTION:
+
+If declared_error_response is true, the agent returned one of the
+error-response phrases explicitly permitted by its behavioral contract
+(for example, when the selected document could not be read). The
+sentence-count rule does not apply to a declared error response. Do not
+record a sentence-count deviation in that case, but note that the run
+produced an error response rather than a normal summary.
 
 Examples:
 

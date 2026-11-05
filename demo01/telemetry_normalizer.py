@@ -974,6 +974,15 @@ class TelemetryNormalizer:
         if text is None:
             return None
 
+        lowered = text.lower()
+
+        matches_declared_error_response = any(
+            marker.lower() in lowered
+            for marker in (
+                self.baseline.expected_behavior.error_response_markers
+            )
+        )
+
         return OutputObservation(
             sentence_count=self._count_sentences(text),
             character_count=len(text),
@@ -986,6 +995,9 @@ class TelemetryNormalizer:
             contains_possible_pii=any(
                 pattern.search(text)
                 for pattern in POSSIBLE_PII_PATTERNS
+            ),
+            matches_declared_error_response=(
+                matches_declared_error_response
             ),
             output_available=True,
         )

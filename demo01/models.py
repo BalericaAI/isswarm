@@ -120,6 +120,14 @@ class ExpectedBehavior(GuardianBaseModel):
         ge=1,
     )
 
+    # Declared error-response phrases. When the final output contains one
+    # of these markers (case-insensitive), the sentence-count rule does
+    # not apply: the behavioral contract explicitly permits a short error
+    # response instead of the normal output shape.
+    error_response_markers: list[str] = Field(
+        default_factory=list,
+    )
+
 
 class AgentBaseline(GuardianBaseModel):
     """
@@ -304,6 +312,10 @@ class OutputObservation(GuardianBaseModel):
     contains_possible_secret: bool = False
 
     contains_possible_pii: bool = False
+
+    # True when the output matches a declared error-response marker from
+    # the behavioral baseline. Set deterministically by the normalizer.
+    matches_declared_error_response: bool = False
 
     output_available: bool = True
 
