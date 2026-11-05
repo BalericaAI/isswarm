@@ -8,7 +8,8 @@ crewai>=1.15.22,<2.0
 langgraph>=1.2.20,<2.0
 
 # Strict security contracts and graph boundary validation
-pydantic>=2.14.3,<3.0
+# NOTE: crewai 1.15.x requires pydantic >=2.11.9,<2.13
+pydantic>=2.11.9,<2.13
 
 # Environment configuration
 python-dotenv>=1.2.4,<2.0

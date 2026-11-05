@@ -1,5 +1,131 @@
 # Guardian Telemetry Swarm — Runbook
 
+# 0. Compile Protocol (Machine-Executable)
+
+This section exists so that Glean — or any AI agent that has loaded this
+runbook and controls a shell-capable execution environment — can compile
+the Guardian application without human interaction.
+
+Glean itself does not execute Python (see Section 33). When this runbook
+is loaded into Glean, the Glean agent must direct a connected execution
+environment (VM, container, workstation, or coding-assistant runtime) to
+run the steps below, in order, from the directory containing this file.
+
+## 0.1 Preconditions
+
+```text
+1. Working directory = the directory containing runbook.md,
+   main.py, and requirements.txt (the Guardian project root).
+
+2. Python 3.12.x available as `python3` (or `python` on Windows).
+
+3. Network access to PyPI.
+
+4. NO credentials are required. Compilation never calls an LLM,
+   Splunk, or Glean. Do not ask for API keys to compile.
+```
+
+## 0.2 Steps
+
+Execute each step. Compare output against the expected marker.
+Stop at the first failed step and report it (see 0.3).
+
+### STEP 1 — Verify Python
+
+```bash
+python3 --version
+```
+
+PASS when output begins with `Python 3.12`.
+
+### STEP 2 — Create and use an isolated environment
+
+```bash
+python3 -m venv .venv
+```
+
+PASS when the command exits 0 and `.venv/` exists.
+
+If this fails on Debian/Ubuntu with "ensurepip is not available", first run
+`sudo apt-get update && sudo apt-get install -y python3.12-venv`,
+delete `.venv`, and retry.
+
+All later steps invoke the interpreter as `.venv/bin/python`
+(Windows: `.venv\Scripts\python`). Activating the environment is
+equivalent and also acceptable.
+
+### STEP 3 — Install dependencies
+
+```bash
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+PASS when both commands exit 0.
+
+### STEP 4 — Verify dependencies
+
+```bash
+.venv/bin/python -c "import crewai, langgraph, pydantic, requests, dotenv; print('Guardian dependencies OK')"
+```
+
+PASS when output contains exactly:
+
+```text
+Guardian dependencies OK
+```
+
+### STEP 5 — Compile all Guardian source
+
+```bash
+.venv/bin/python -m compileall -q -x '\.venv' .
+```
+
+PASS when the command exits 0 with no syntax errors.
+
+The `-x '\.venv'` exclusion is mandatory: third-party packages inside
+`.venv` are not Guardian source and must not be compiled or judged.
+
+### STEP 6 — Compile the Guardian LangGraph
+
+```bash
+.venv/bin/python -c "from guardian_graph import build_guardian_graph; build_guardian_graph(); print('Guardian graph compiled OK')"
+```
+
+PASS when output contains exactly:
+
+```text
+Guardian graph compiled OK
+```
+
+## 0.3 Result contract
+
+After the steps, report exactly one of:
+
+```text
+COMPILE_RESULT: PASS
+```
+
+when STEP 1 through STEP 6 all passed, or:
+
+```text
+COMPILE_RESULT: FAIL
+FAILED_STEP: <step number>
+EVIDENCE: <the command's stderr/stdout>
+```
+
+Do not report PASS with missing steps. Do not continue past a failure.
+
+## 0.4 Out of scope for compilation
+
+Compilation does not execute the security swarm. Running Guardian
+against telemetry (mock or live) additionally requires the `.env`
+configuration in Section 10 and an LLM provider credential, and is
+covered by Sections 11–12 and 19–20. An agent asked only to "compile"
+must stop after Section 0.3 and must not request credentials.
+
+---
+
 ## 1. Purpose
 
 Guardian is an external security-observability system for Glean agents.
@@ -203,7 +329,7 @@ GuardianTelemetrySwarm/
 ├── registry/
 │   └── monitored_agents.json
 │
-├── baselines/
+├── baseline/
 │   └── five_sentence_reviewer.json
 │
 ├── mock_telemetry/
@@ -305,8 +431,10 @@ Guardian dependencies OK
 Perform a syntax compilation check:
 
 ```bash
-python -m compileall .
+python -m compileall -q -x '\.venv' .
 ```
+
+Always exclude `.venv` — third-party packages are not Guardian source.
 
 No Guardian Python module should produce a syntax error.
 
@@ -387,7 +515,7 @@ OPENAI_API_KEY=replace_me
 # ============================================================
 
 AGENT_REGISTRY_FILE=registry/monitored_agents.json
-BASELINE_DIR=baselines
+BASELINE_DIR=baseline
 
 REGISTRATION_DEFAULT_OWNER=Demo Team
 
@@ -409,7 +537,7 @@ TELEMETRY_MODE=mock
 MOCK_TELEMETRY_FILE=mock_telemetry/normal_run.json
 RUN_ID=run-normal-001
 
-BASELINE_FILE=baselines/five_sentence_reviewer.json
+BASELINE_FILE=baseline/five_sentence_reviewer.json
 
 
 # ============================================================
@@ -474,7 +602,7 @@ Set:
 TELEMETRY_MODE=mock
 MOCK_TELEMETRY_FILE=mock_telemetry/normal_run.json
 RUN_ID=run-normal-001
-BASELINE_FILE=baselines/five_sentence_reviewer.json
+BASELINE_FILE=baseline/five_sentence_reviewer.json
 ```
 
 Run:
@@ -816,8 +944,11 @@ Guardian therefore does not need to restart every time a new application is regi
 Behavioral contracts live under:
 
 ```text
-baselines/
+baseline/
 ```
+
+(`BASELINE_DIR` controls where `register_agent.py` writes new
+contracts; keep it set to `baseline` so all contracts live together.)
 
 Each registered agent may have multiple historical versions.
 
@@ -1314,6 +1445,9 @@ This allows mock scenarios to act as regression tests for the live security engi
 
 # 32. Instructions for Glean or an AI Coding Assistant Reading This Repository
 
+When asked to **compile** or **build** Guardian, follow Section 0
+(Compile Protocol) exactly and report its result contract.
+
 When assisting with this project:
 
 ## Do
@@ -1378,7 +1512,7 @@ Before the live demonstration:
 
 [ ] requirements.txt installed
 
-[ ] python -m compileall . succeeds
+[ ] python -m compileall -q -x '\.venv' . succeeds
 
 [ ] Guardian LangGraph compilation succeeds
 

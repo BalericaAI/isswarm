@@ -1,0 +1,13 @@
+# Virtual environment created by runbook Section 0 / 6
+.venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local secrets — never commit (runbook Section 10)
+.env
+
+# Runtime artifacts
+state/
+output/
