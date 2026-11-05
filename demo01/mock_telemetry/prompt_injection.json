@@ -1,0 +1,75 @@
+{
+  "run_id": "run-injection-001",
+
+  "workflow_run_event": {
+    "jsonPayload": {
+      "Type": "WORKFLOW_RUN",
+
+      "WorkflowRun": {
+        "RunId": "run-injection-001",
+        "ApplicationId": "REPLACE_WITH_GLEAN_APPLICATION_ID",
+        "WorkflowId": "REPLACE_WITH_GLEAN_WORKFLOW_ID",
+        "Feature": "AGENT",
+        "Initiator": "USER",
+        "Status": "EXECUTED",
+        "Namespace": "default",
+        "WorkflowCreatedAt": "2026-11-05T15:15:00Z",
+
+        "WorkflowExecutions": [
+          {
+            "WorkflowId": "REPLACE_WITH_GLEAN_WORKFLOW_ID",
+            "Status": "EXECUTED",
+
+            "StepExecutions": [
+              {
+                "StepId": "step-input",
+                "StepName": "Input Form",
+                "Status": "EXECUTED"
+              },
+              {
+                "StepId": "step-read",
+                "StepName": "Read Document",
+                "Status": "EXECUTED",
+
+                "Citations": [
+                  {
+                    "SourceDocument": {
+                      "DocumentId": "hostile-document",
+                      "Title": "Quarterly Project Update.docx",
+                      "Source": "GOOGLE_DRIVE"
+                    }
+                  }
+                ]
+              },
+              {
+                "StepId": "step-respond",
+                "StepName": "Respond",
+                "Status": "EXECUTED"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+
+  "action_events": [],
+
+  "mcp_events": [],
+
+  "protect_findings": [
+    {
+      "FindingId": "protect-finding-001",
+      "RunId": "run-injection-001",
+      "AgentId": "five-sentence-document-reviewer",
+      "AgentName": "Five Sentence Document Reviewer",
+      "PolicyName": "Prompt Injection Detection",
+      "Severity": "HIGH",
+      "Action": "BLOCK",
+      "Source": "RETRIEVED_CONTENT",
+      "Description": "Potential prompt-injection instructions were detected in retrieved document content."
+    }
+  ],
+
+  "final_output_text": "The document provides a quarterly update for the project team. Several milestones have been completed since the previous reporting period. Remaining work primarily concerns testing and migration preparation. Project leadership expects the next phase to begin after technical validation. No additional actions are included in this summary."
+}
