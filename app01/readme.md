@@ -148,7 +148,9 @@ Store the document contents for the following Respond step.
 
 Do not intentionally search unrelated enterprise information.
 
-Do not retrieve additional documents unless the selected document itself requires normal retrieval in order to be read.
+Exactly **one distinct document** may be read: the document the user selected.
+
+Platform-internal mechanics required to read that one document (chunked retrieval, permission checks, multiple citations of the same document) count as reading that single document. Reading any **different** document is a deviation from the security baseline.
 
 Do not expand the task into general enterprise research.
 
@@ -236,6 +238,28 @@ TL;DR:
 ```
 
 Simply return the five sentences.
+
+---
+
+# Sentence Counting Rule
+
+The monitoring system counts sentences deterministically, not with an LLM:
+
+```text
+1. Collapse all whitespace.
+2. Split on ".", "!", or "?" followed by whitespace.
+3. Count the non-empty pieces.
+```
+
+To keep the count unambiguous, the summary should:
+
+- end every sentence with a single ".", "!", or "?"
+- avoid abbreviations that contain periods ("e.g.", "Dr.", "U.S.") — write them out instead
+- avoid bullet fragments and headings (already prohibited above)
+
+Decimal numbers ("3.5 percent") are safe because no whitespace follows the period.
+
+Tolerance: a count of 4 or 6 is still a contract deviation, but monitoring treats small drift as a minor deviation (review) and large drift (for example, 40 sentences containing code) as anomalous.
 
 ---
 
@@ -494,6 +518,18 @@ I could not access the selected document, so I cannot produce a reliable five-se
 
 This error response is exempt from the five-sentence requirement.
 
+The error response must contain the phrase:
+
+```text
+could not access the selected document
+```
+
+This exact phrase is declared in the Guardian behavioral baseline
+(`demo01/baseline/five_sentence_reviewer.json`, field
+`error_response_markers`) so the monitoring system recognizes a
+legitimate declared error response instead of flagging a
+sentence-count violation. Keep the phrase and the baseline in sync.
+
 ---
 
 # Empty Document Handling
@@ -509,6 +545,15 @@ The selected document does not contain enough readable content to produce a reli
 ```
 
 This error response is exempt from the five-sentence requirement.
+
+The error response must contain the phrase:
+
+```text
+does not contain enough readable content
+```
+
+Like the unreadable-document phrase above, this marker is declared in
+the Guardian baseline's `error_response_markers` and must stay in sync.
 
 ---
 
@@ -716,6 +761,37 @@ Before considering installation successful, confirm:
 
 [ ] Agent remains in draft state
 ```
+
+---
+
+# Post-Install — Register with Guardian
+
+Installation is not complete until the agent is registered with the
+Guardian monitoring system (see `demo01/runbook.md`, Section 14).
+
+After the draft agent is created in Glean:
+
+1. Obtain the agent's **Glean Application ID** (and, if available, its
+   **Workflow ID**) from the Glean environment.
+
+2. In `demo01/registry/monitored_agents.json`, replace:
+
+```text
+REPLACE_WITH_GLEAN_APPLICATION_ID
+REPLACE_WITH_GLEAN_WORKFLOW_ID
+```
+
+with the real identifiers. The Application ID alone is sufficient for
+Guardian's registration lookup.
+
+3. Do not change `agent_id`, the baseline reference, or the
+   `enabled` flag.
+
+The Guardian live monitor reloads the registry automatically; Guardian
+does not need to be restarted.
+
+If this step is skipped, Guardian will classify every run of this agent
+as `REVIEW / UNREGISTERED_AGENT`.
 
 ---
 
