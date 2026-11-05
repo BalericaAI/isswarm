@@ -1,0 +1,45 @@
+{
+  "registry_version": "1.0",
+  "agents": [
+    {
+      "agent_id": "five-sentence-document-reviewer",
+      "agent_name": "Five Sentence Document Reviewer",
+      "enabled": true,
+      "owner": "AI Security Demo Team",
+      "risk_tier": "LOW",
+
+      "workflow_ids": [
+        "REPLACE_WITH_GLEAN_WORKFLOW_ID"
+      ],
+
+      "application_ids": [
+        "REPLACE_WITH_GLEAN_APPLICATION_ID"
+      ],
+
+      "namespaces": [
+        "default"
+      ],
+
+      "baselines": [
+        {
+          "version": "1.0",
+          "file": "baselines/five_sentence_reviewer.json",
+          "effective_from": "2026-11-05T00:00:00Z",
+          "effective_until": null,
+          "enabled": true,
+          "notes": "Initial read-only behavioral baseline for the Five Sentence Document Reviewer security monitoring demonstration."
+        }
+      ],
+
+      "description": "Read-only Glean document summarization agent that accepts one user-selected document and returns exactly five sentences. This is the initial monitored application for the Guardian Telemetry Swarm PoC.",
+
+      "tags": [
+        "glean",
+        "document-review",
+        "read-only",
+        "guardian-demo",
+        "low-risk"
+      ]
+    }
+  ]
+}
