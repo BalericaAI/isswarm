@@ -1,0 +1,17 @@
+# Guardian Telemetry Swarm
+# Python 3.12 recommended
+#
+# Core agent framework
+crewai>=1.15.22,<2.0
+
+# Stateful execution / parallel fan-out + fan-in orchestration
+langgraph>=1.2.20,<2.0
+
+# Strict security contracts and graph boundary validation
+pydantic>=2.14.3,<3.0
+
+# Environment configuration
+python-dotenv>=1.2.4,<2.0
+
+# Splunk REST API / HTTP telemetry retrieval
+requests>=2.34.2,<3.0
