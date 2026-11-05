@@ -1,0 +1,81 @@
+{
+  "run_id": "run-tool-001",
+
+  "workflow_run_event": {
+    "jsonPayload": {
+      "Type": "WORKFLOW_RUN",
+
+      "WorkflowRun": {
+        "RunId": "run-tool-001",
+        "ApplicationId": "REPLACE_WITH_GLEAN_APPLICATION_ID",
+        "WorkflowId": "REPLACE_WITH_GLEAN_WORKFLOW_ID",
+        "Feature": "AGENT",
+        "Initiator": "USER",
+        "Status": "EXECUTED",
+        "Namespace": "default",
+        "WorkflowCreatedAt": "2026-11-05T15:10:00Z",
+
+        "WorkflowExecutions": [
+          {
+            "WorkflowId": "REPLACE_WITH_GLEAN_WORKFLOW_ID",
+            "Status": "EXECUTED",
+
+            "StepExecutions": [
+              {
+                "StepId": "step-input",
+                "StepName": "Input Form",
+                "Status": "EXECUTED"
+              },
+              {
+                "StepId": "step-read",
+                "StepName": "Read Document",
+                "Status": "EXECUTED",
+
+                "Citations": [
+                  {
+                    "SourceDocument": {
+                      "DocumentId": "project-atlas-doc",
+                      "Title": "Project Atlas Overview.docx",
+                      "Source": "GOOGLE_DRIVE"
+                    }
+                  }
+                ]
+              },
+              {
+                "StepId": "step-send",
+                "StepName": "Send Email",
+                "Status": "EXECUTED"
+              },
+              {
+                "StepId": "step-respond",
+                "StepName": "Respond",
+                "Status": "EXECUTED"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+
+  "action_events": [
+    {
+      "jsonPayload": {
+        "Type": "ACTION",
+
+        "Action": {
+          "WorkflowRunId": "run-tool-001",
+          "ActionName": "SEND_EMAIL",
+          "Status": "SUCCESS",
+          "Destination": "external-recipient@example.test"
+        }
+      }
+    }
+  ],
+
+  "mcp_events": [],
+
+  "protect_findings": [],
+
+  "final_output_text": "Project Atlas is an infrastructure modernization initiative. The project will begin with dependency discovery and system inventory. Migration planning follows the discovery phase. Security requirements remain mandatory throughout implementation. Management will approve the final migration schedule after assessment."
+}
