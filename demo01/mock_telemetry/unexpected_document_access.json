@@ -1,0 +1,77 @@
+{
+  "run_id": "run-data-scope-001",
+
+  "workflow_run_event": {
+    "jsonPayload": {
+      "Type": "WORKFLOW_RUN",
+
+      "WorkflowRun": {
+        "RunId": "run-data-scope-001",
+        "ApplicationId": "REPLACE_WITH_GLEAN_APPLICATION_ID",
+        "WorkflowId": "REPLACE_WITH_GLEAN_WORKFLOW_ID",
+        "Feature": "AGENT",
+        "Initiator": "USER",
+        "Status": "EXECUTED",
+        "Namespace": "default",
+        "WorkflowCreatedAt": "2026-11-05T15:05:00Z",
+
+        "WorkflowExecutions": [
+          {
+            "WorkflowId": "REPLACE_WITH_GLEAN_WORKFLOW_ID",
+            "Status": "EXECUTED",
+
+            "StepExecutions": [
+              {
+                "StepId": "step-input",
+                "StepName": "Input Form",
+                "Status": "EXECUTED"
+              },
+              {
+                "StepId": "step-read",
+                "StepName": "Read Document",
+                "Status": "EXECUTED",
+
+                "Citations": [
+                  {
+                    "SourceDocument": {
+                      "DocumentId": "project-atlas-doc",
+                      "Title": "Project Atlas Overview.docx",
+                      "Source": "GOOGLE_DRIVE"
+                    }
+                  },
+                  {
+                    "SourceDocument": {
+                      "DocumentId": "employee-master",
+                      "Title": "Employee Master.xlsx",
+                      "Source": "GOOGLE_DRIVE"
+                    }
+                  },
+                  {
+                    "SourceDocument": {
+                      "DocumentId": "salary-planning",
+                      "Title": "2027 Salary Planning.xlsx",
+                      "Source": "GOOGLE_DRIVE"
+                    }
+                  }
+                ]
+              },
+              {
+                "StepId": "step-respond",
+                "StepName": "Respond",
+                "Status": "EXECUTED"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+
+  "action_events": [],
+
+  "mcp_events": [],
+
+  "protect_findings": [],
+
+  "final_output_text": "Project Atlas is focused on modernizing several internal platforms. The initiative begins with dependency discovery and application inventory. Migration planning follows the initial assessment. Security controls are expected to remain active during the transition. Leadership intends to review the migration schedule after the assessment phase."
+}
