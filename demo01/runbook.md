@@ -1,0 +1,1497 @@
+# Guardian Telemetry Swarm — Runbook
+
+## 1. Purpose
+
+Guardian is an external security-observability system for Glean agents.
+
+Guardian monitors Glean agent execution telemetry and compares observed behavior against a registered behavioral security contract.
+
+Guardian answers:
+
+> Did this Glean agent behave within the boundaries expected for this application?
+
+Guardian Demo #2 is **observational only**.
+
+Guardian may return:
+
+- `NORMAL`
+- `REVIEW`
+- `ALERT`
+
+Guardian does **not** automatically block, cancel, disable, modify, or otherwise enforce against a Glean agent.
+
+Every final `GuardianDecision` must therefore contain:
+
+```text
+enforcement_performed = false
+```
+
+Enforcement belongs to a future Guardian Demo #3.
+
+---
+
+# 2. Architecture
+
+Guardian uses four major technologies for four different responsibilities:
+
+```text
+Pydantic
+    =
+trusted data contracts
+
+CrewAI
+    =
+specialist security reasoning
+
+LangGraph
+    =
+parallel execution orchestration
+
+Glean + Splunk
+    =
+live enterprise telemetry
+```
+
+High-level architecture:
+
+```text
+                        GLEAN
+
+              Monitored Glean Agents
+                        |
+                        v
+                 Customer Event Logs
+                        |
+          +-------------+-------------+
+          |             |             |
+    WORKFLOW_RUN      ACTION      MCP_USAGE
+          |             |             |
+          +-------------+-------------+
+                        |
+                  Glean Protect
+                        |
+                        v
+                      SPLUNK
+                        |
+                        v
+                  live_monitor.py
+                        |
+                  Agent Registry
+                        |
+                        v
+              Behavioral Baseline
+                        |
+                        v
+               TelemetryNormalizer
+                        |
+                        v
+                  GuardianGraph
+                        |
+       +---------+------+-------+---------+
+       |         |      |       |         |
+       v         v      v       v         v
+      Run       Tool   Data   Output    Protect
+      Spy       Spy    Spy     Spy       Spy
+       |         |      |       |         |
+       +---------+------+-------+---------+
+                        |
+                   synchronization
+                        |
+                        v
+                Guardian Correlator
+                        |
+            +-----------+-----------+
+            |           |           |
+          NORMAL      REVIEW       ALERT
+```
+
+---
+
+# 3. Important Design Rules
+
+Do not rewrite or collapse these architectural boundaries.
+
+## Observation is not judgment
+
+```text
+OBSERVATION != JUDGMENT
+```
+
+Telemetry normalization must remain deterministic.
+
+## Detection is not enforcement
+
+```text
+DETECTION != ENFORCEMENT
+```
+
+Guardian Demo #2 does not alter Glean execution.
+
+## Anomaly is not compromise
+
+```text
+ANOMALY != COMPROMISE
+```
+
+Unexpected behavior can require investigation without proving malicious activity.
+
+## Missing evidence is not safe behavior
+
+```text
+MISSING EVIDENCE != NORMAL
+```
+
+Incomplete telemetry should generally produce `REVIEW`, not `NORMAL`.
+
+## Security is not majority voting
+
+Four specialists reporting `NORMAL` must not override one decisive high-confidence security fact.
+
+Example:
+
+```text
+Run Spy       NORMAL
+Tool Spy      ALERT: SEND_EMAIL
+Data Spy      NORMAL
+Output Spy    NORMAL
+Protect Spy   NORMAL
+```
+
+The final result must not become `NORMAL`.
+
+## Glean Protect blocking an event does not mean the control failed
+
+```text
+BLOCKED ATTACK != CONTROL FAILURE
+```
+
+A successful Glean Protect block may demonstrate that the preventive control operated correctly.
+
+---
+
+# 4. Repository Layout
+
+Expected repository:
+
+```text
+GuardianTelemetrySwarm/
+│
+├── main.py
+├── live_monitor.py
+├── register_agent.py
+│
+├── models.py
+├── agent_registry.py
+│
+├── telemetry_client.py
+├── telemetry_normalizer.py
+│
+├── graph_state.py
+├── guardian_graph.py
+├── guardian_correlator.py
+│
+├── run_behavior_agent.py
+├── tool_behavior_agent.py
+├── data_access_agent.py
+├── output_behavior_agent.py
+├── protect_findings_agent.py
+│
+├── requirements.txt
+├── runbook.md
+├── .env
+│
+├── registry/
+│   └── monitored_agents.json
+│
+├── baselines/
+│   └── five_sentence_reviewer.json
+│
+├── mock_telemetry/
+│   ├── normal_run.json
+│   ├── unexpected_document_access.json
+│   ├── unexpected_tool_use.json
+│   ├── prompt_injection.json
+│   └── compound_attack.json
+│
+├── state/
+│   └── guardian_runs.db
+│
+└── output/
+    └── live/
+```
+
+`state/` and `output/` may be created automatically during execution.
+
+---
+
+# 5. Python Requirements
+
+Use:
+
+```text
+Python 3.12
+```
+
+Python 3.12 is recommended for the demo environment.
+
+Do not use Python 3.14 with the current CrewAI dependency set.
+
+Verify:
+
+```bash
+python --version
+```
+
+Expected:
+
+```text
+Python 3.12.x
+```
+
+---
+
+# 6. Create Virtual Environment
+
+From the project root:
+
+```bash
+python -m venv .venv
+```
+
+## Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+## macOS / Linux
+
+```bash
+source .venv/bin/activate
+```
+
+Upgrade pip:
+
+```bash
+python -m pip install --upgrade pip
+```
+
+Install Guardian:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+---
+
+# 7. Verify Dependencies
+
+Run:
+
+```bash
+python -c "import crewai, langgraph, pydantic, requests, dotenv; print('Guardian dependencies OK')"
+```
+
+Expected:
+
+```text
+Guardian dependencies OK
+```
+
+---
+
+# 8. Compile Python Source
+
+Perform a syntax compilation check:
+
+```bash
+python -m compileall .
+```
+
+No Guardian Python module should produce a syntax error.
+
+This does not execute the security swarm.
+
+It only verifies that Python can compile the source.
+
+---
+
+# 9. Verify LangGraph Construction
+
+Run:
+
+```bash
+python -c "from guardian_graph import build_guardian_graph; build_guardian_graph(); print('Guardian graph compiled OK')"
+```
+
+Expected:
+
+```text
+Guardian graph compiled OK
+```
+
+If this succeeds, LangGraph can construct:
+
+```text
+START
+  |
+initialize
+  |
+  +--> Run Spy
+  +--> Tool Spy
+  +--> Data Spy
+  +--> Output Spy
+  +--> Protect Spy
+            |
+            v
+       synchronize
+            |
+            v
+        correlate
+            |
+            v
+         finalize
+            |
+           END
+```
+
+---
+
+# 10. Environment Configuration
+
+Create:
+
+```text
+.env
+```
+
+Never commit real API tokens or credentials to Git.
+
+Example:
+
+```bash
+# ============================================================
+# CrewAI / LLM
+# ============================================================
+
+CREWAI_MODEL=openai/gpt-4.1-mini
+CREWAI_VERBOSE=false
+
+# Configure the API credential required by the model provider.
+# Example when using an OpenAI-backed CrewAI model:
+OPENAI_API_KEY=replace_me
+
+
+# ============================================================
+# Guardian Agent Registry
+# ============================================================
+
+AGENT_REGISTRY_FILE=registry/monitored_agents.json
+BASELINE_DIR=baselines
+
+REGISTRATION_DEFAULT_OWNER=Demo Team
+
+
+# ============================================================
+# Telemetry Mode
+#
+# mock
+# splunk
+# ============================================================
+
+TELEMETRY_MODE=mock
+
+
+# ============================================================
+# Mock Mode
+# ============================================================
+
+MOCK_TELEMETRY_FILE=mock_telemetry/normal_run.json
+RUN_ID=run-normal-001
+
+BASELINE_FILE=baselines/five_sentence_reviewer.json
+
+
+# ============================================================
+# Splunk / Live Glean Telemetry
+# ============================================================
+
+SPLUNK_BASE_URL=https://splunk.example.com:8089
+SPLUNK_TOKEN=replace_me
+SPLUNK_GLEAN_INDEX=glean
+
+SPLUNK_VERIFY_TLS=true
+SPLUNK_TIMEOUT_SECONDS=30
+
+SPLUNK_EARLIEST_TIME=-15m
+SPLUNK_LATEST_TIME=now
+
+
+# ============================================================
+# Optional Environment-Specific Correlation Searches
+# ============================================================
+
+# Exact searches depend on how the tenant exports these events.
+#
+# Configure when necessary:
+#
+# SPLUNK_MCP_SEARCH=
+# SPLUNK_PROTECT_SEARCH=
+# SPLUNK_OUTPUT_SEARCH=
+
+
+# ============================================================
+# Live Monitor
+# ============================================================
+
+LIVE_DISCOVERY_EARLIEST_TIME=-15m
+LIVE_DISCOVERY_LATEST_TIME=now
+
+LIVE_POLL_SECONDS=30
+
+# Allow ACTION / MCP / Protect events to arrive before analysis.
+LIVE_SETTLE_SECONDS=30
+
+LIVE_MAX_ATTEMPTS=3
+
+LIVE_MONITOR_LEDGER=state/guardian_runs.db
+LIVE_OUTPUT_DIR=output/live
+
+# true = perform one discovery cycle and stop
+# false = continue monitoring
+LIVE_RUN_ONCE=true
+```
+
+---
+
+# 11. First Test — Mock Mode
+
+Before connecting Guardian to live Glean telemetry, verify the complete application using known test data.
+
+Set:
+
+```bash
+TELEMETRY_MODE=mock
+MOCK_TELEMETRY_FILE=mock_telemetry/normal_run.json
+RUN_ID=run-normal-001
+BASELINE_FILE=baselines/five_sentence_reviewer.json
+```
+
+Run:
+
+```bash
+python main.py
+```
+
+Expected conceptual result:
+
+```text
+GUARDIAN FINAL RESULT
+
+Guardian Status  : NORMAL
+Security Review  : False
+Enforcement      : False
+```
+
+The exact natural-language summary can vary.
+
+The security disposition must remain consistent with deterministic Guardian rules.
+
+---
+
+# 12. Regression Scenarios
+
+Run each mock scenario before the live demonstration.
+
+## Normal
+
+```text
+mock_telemetry/normal_run.json
+```
+
+Expected minimum:
+
+```text
+NORMAL
+```
+
+## Unexpected document access
+
+```text
+mock_telemetry/unexpected_document_access.json
+```
+
+Expected minimum:
+
+```text
+REVIEW
+```
+
+Likely reason:
+
+```text
+DATA_SCOPE_EXPANSION
+```
+
+## Unexpected tool use
+
+```text
+mock_telemetry/unexpected_tool_use.json
+```
+
+Expected:
+
+```text
+ALERT
+HIGH
+```
+
+Mandatory concept:
+
+```text
+UNEXPECTED_WRITE_CAPABILITY
+```
+
+## Prompt injection
+
+```text
+mock_telemetry/prompt_injection.json
+```
+
+Expected:
+
+```text
+ALERT
+HIGH
+```
+
+Mandatory concept:
+
+```text
+PROTECT_BLOCK
+```
+
+## Compound attack
+
+```text
+mock_telemetry/compound_attack.json
+```
+
+Expected:
+
+```text
+ALERT
+CRITICAL
+```
+
+Multiple independent security domains should agree.
+
+---
+
+# 13. Glean Demo Application
+
+The initial monitored application is:
+
+```text
+Five Sentence Document Reviewer
+```
+
+Its intended behavior is intentionally simple.
+
+Expected workflow:
+
+```text
+Input Form
+    |
+Read Document
+    |
+Respond
+```
+
+Expected security behavior:
+
+```text
+Read one user-selected document.
+
+Return exactly five sentences.
+
+No email.
+
+No messages.
+
+No external APIs.
+
+No MCP.
+
+No document writes.
+
+No permission changes.
+
+No code execution.
+
+No unrelated enterprise search.
+```
+
+This simplicity creates a strong security baseline.
+
+---
+
+# 14. Register the Initial Glean Application
+
+After the Glean application has been created, obtain its Application ID.
+
+The existing registry contains a placeholder:
+
+```text
+REPLACE_WITH_GLEAN_APPLICATION_ID
+```
+
+For the initial demo app, replace the placeholder with the real Glean Application ID.
+
+If a Workflow ID is available, replace:
+
+```text
+REPLACE_WITH_GLEAN_WORKFLOW_ID
+```
+
+as well.
+
+Application ID alone is sufficient for Guardian's registration lookup.
+
+---
+
+# 15. Interactive Registration of Additional Agents
+
+Guardian supports live onboarding.
+
+Run:
+
+```bash
+python register_agent.py
+```
+
+The operator will be asked:
+
+```text
+Glean Application ID:
+>
+```
+
+Enter the Glean App ID supplied by the application owner.
+
+Guardian then asks:
+
+```text
+Owner:
+>
+```
+
+Then:
+
+```text
+Describe what this agent is supposed to do.
+>
+```
+
+Example:
+
+```text
+The agent reads employee expense reports and receipts, checks them
+against company policy, and creates a draft expense record. It can
+read up to 15 documents and use the approved expense MCP once. It must
+never approve payments, delete records, change permissions, send email,
+or execute code.
+```
+
+Guardian will generate a **draft behavioral security contract**.
+
+The contract must be displayed before registration.
+
+The operator must explicitly approve:
+
+```text
+Register this agent with Guardian? [y/N]:
+```
+
+Only:
+
+```text
+y
+```
+
+or:
+
+```text
+yes
+```
+
+authorizes registration.
+
+---
+
+# 16. Critical Registration Rule
+
+The onboarding LLM does not authorize security permissions.
+
+Architecture:
+
+```text
+Natural-language description
+        |
+        v
+LLM drafts contract
+        |
+        v
+Pydantic validation
+        |
+        v
+Deterministic consistency checks
+        |
+        v
+Human review
+        |
+        v
+Human approval
+        |
+        v
+Registry
+```
+
+Therefore:
+
+```text
+LLM = configuration assistant
+
+Human = authorization
+```
+
+Never remove the human approval boundary.
+
+---
+
+# 17. Registry
+
+Registered agents live in:
+
+```text
+registry/monitored_agents.json
+```
+
+Each agent may contain:
+
+```text
+Application IDs
+Workflow IDs
+Owner
+Risk Tier
+Enabled / Disabled state
+Baseline versions
+Tags
+```
+
+Example conceptual registration:
+
+```json
+{
+  "agent_id": "expense-report-reviewer",
+  "agent_name": "Expense Report Reviewer",
+  "enabled": true,
+  "owner": "Finance",
+  "risk_tier": "HIGH",
+  "workflow_ids": [],
+  "application_ids": [
+    "app-9fa881"
+  ]
+}
+```
+
+The registry is reloaded by the live monitor.
+
+Guardian therefore does not need to restart every time a new application is registered.
+
+---
+
+# 18. Versioned Baselines
+
+Behavioral contracts live under:
+
+```text
+baselines/
+```
+
+Each registered agent may have multiple historical versions.
+
+Example:
+
+```text
+Payroll Assistant
+
+v1.0
+    no MCP allowed
+
+v2.0
+    Workday MCP allowed
+```
+
+Guardian selects the baseline that was active when the Glean run occurred.
+
+Do not judge historical activity against a newer contract.
+
+---
+
+# 19. Start Live Glean Monitoring
+
+Change:
+
+```bash
+TELEMETRY_MODE=splunk
+```
+
+Configure:
+
+```bash
+SPLUNK_BASE_URL=
+SPLUNK_TOKEN=
+SPLUNK_GLEAN_INDEX=
+```
+
+For the first live test:
+
+```bash
+LIVE_RUN_ONCE=true
+```
+
+Run:
+
+```bash
+python live_monitor.py
+```
+
+Guardian will perform one discovery pass.
+
+---
+
+# 20. Continuous Mode
+
+After the smoke test succeeds:
+
+```bash
+LIVE_RUN_ONCE=false
+```
+
+Run:
+
+```bash
+python live_monitor.py
+```
+
+The monitor will periodically search for new Glean Agent runs.
+
+Default:
+
+```text
+30-second polling interval
+30-second telemetry settling period
+```
+
+The settling period exists so associated:
+
+```text
+ACTION
+MCP_USAGE
+Protect
+output
+```
+
+evidence has time to reach Splunk before Guardian analyzes the run.
+
+---
+
+# 21. Live Runtime Flow
+
+For every newly discovered Glean Agent run:
+
+```text
+WORKFLOW_RUN
+    |
+    v
+Extract:
+    RunId
+    ApplicationId
+    WorkflowId
+    timestamp
+    |
+    v
+Check Run Ledger
+    |
+    +-- already processed --> skip
+    |
+    v
+Wait for telemetry settling window
+    |
+    v
+Agent Registry lookup
+    |
+    +-- unknown --> REVIEW / UNREGISTERED_AGENT
+    |
+    v
+Load historical behavioral baseline
+    |
+    v
+Retrieve complete telemetry
+    |
+    v
+Normalize telemetry
+    |
+    v
+GuardianGraph
+    |
+    +--> Run Spy
+    +--> Tool Spy
+    +--> Data Spy
+    +--> Output Spy
+    +--> Protect Spy
+             |
+             v
+         Correlator
+             |
+             v
+    NORMAL / REVIEW / ALERT
+```
+
+---
+
+# 22. Unknown Applications
+
+If Guardian sees a Glean Application ID that does not exist in the registry:
+
+```text
+UNKNOWN APPLICATION
+```
+
+Guardian must not guess its expected behavior.
+
+Instead:
+
+```text
+Guardian Status:
+    REVIEW
+
+Reason:
+    UNREGISTERED_AGENT
+```
+
+Recommended action:
+
+```text
+IDENTIFY_AGENT_OWNER
+REVIEW_AGENT_CONFIGURATION
+REGISTER_AGENT_BASELINE
+```
+
+---
+
+# 23. Disabled Applications
+
+A registered application may contain:
+
+```json
+"enabled": false
+```
+
+This means:
+
+```text
+KNOWN APPLICATION
+BUT
+GUARDIAN MONITORING INTENTIONALLY DISABLED
+```
+
+This is different from an unregistered application.
+
+Preserve this distinction.
+
+---
+
+# 24. Run Ledger
+
+Live processing state is stored in:
+
+```text
+state/guardian_runs.db
+```
+
+This SQLite database prevents repeated analysis of the same Glean run.
+
+Possible states include:
+
+```text
+PROCESSING
+PROCESSED
+UNREGISTERED
+MONITORING_DISABLED
+ERROR
+```
+
+Errors may retry up to:
+
+```text
+LIVE_MAX_ATTEMPTS
+```
+
+Successfully processed runs must not repeatedly invoke the CrewAI swarm.
+
+---
+
+# 25. Guardian Output
+
+Live results are written beneath:
+
+```text
+output/live/
+```
+
+Example:
+
+```text
+output/live/run-928829_guardian_result.json
+```
+
+A normal Guardian result contains:
+
+```text
+run ID
+monitored agent
+specialist analyses
+Guardian disposition
+severity
+confidence
+reason codes
+recommended actions
+evidence completeness
+missing evidence
+```
+
+The result must always indicate:
+
+```text
+enforcement_performed = false
+```
+
+for Demo #2.
+
+---
+
+# 26. Specialist Responsibilities
+
+## Run Behavior Spy
+
+Question:
+
+> Did the workflow execute in the shape expected by its behavioral contract?
+
+Looks at:
+
+```text
+initiator
+steps
+errors
+status
+unexpected workflow paths
+execution drift
+```
+
+---
+
+## Tool Behavior Spy
+
+Question:
+
+> Did the agent invoke tools or actions outside its expected capabilities?
+
+Looks at:
+
+```text
+actions
+writes
+external actions
+MCP
+forbidden tools
+unknown tools
+```
+
+---
+
+## Data Access Spy
+
+Question:
+
+> Did the agent access only the information required for its declared task?
+
+Looks at:
+
+```text
+documents
+document count
+source systems
+unexpected scope expansion
+citations
+provenance
+```
+
+It does not determine whether data is inherently sensitive.
+
+---
+
+## Output Behavior Spy
+
+Question:
+
+> Did the agent produce the kind of output it was expected to produce?
+
+Looks at:
+
+```text
+output format
+sentence count
+code
+URLs
+possible secret-like patterns
+possible PII-like patterns
+output contract drift
+```
+
+Heuristic secret or PII detection is not confirmation.
+
+---
+
+## Protect Findings Spy
+
+Question:
+
+> What did Glean's own native security controls identify?
+
+It interprets existing Glean Protect findings.
+
+It does not recreate Glean Protect.
+
+---
+
+# 27. Guardian Correlator
+
+The correlator receives all five specialist results.
+
+It does not use simple voting.
+
+Before LLM correlation, deterministic Python establishes a minimum permitted security disposition.
+
+Examples:
+
+```text
+Specialist failure
+    -> minimum REVIEW
+
+Incomplete telemetry
+    -> minimum REVIEW
+
+Unexpected write
+    -> minimum ALERT
+
+Protect BLOCK
+    -> minimum ALERT
+
+Critical specialist finding
+    -> minimum ALERT
+```
+
+The LLM may escalate.
+
+The LLM must never downgrade below deterministic guardrails.
+
+---
+
+# 28. LangGraph Responsibilities
+
+`guardian_graph.py` owns execution orchestration.
+
+It must:
+
+```text
+initialize
+    |
+fan five specialists out in parallel
+    |
+wait for all five branches
+    |
+synchronize
+    |
+invoke Guardian Correlator
+    |
+finalize
+```
+
+Each specialist writes to a unique state key.
+
+Do not make all five specialists write to one common list unless an explicit LangGraph reducer is added.
+
+---
+
+# 29. Failure Behavior
+
+A failed specialist must not terminate monitoring of the entire run.
+
+Example:
+
+```text
+Run Spy       SUCCESS
+Tool Spy      SUCCESS
+Data Spy      SUCCESS
+Output Spy    ERROR
+Protect Spy   SUCCESS
+```
+
+Guardian must continue to correlation.
+
+The specialist error becomes missing evidence.
+
+The final result cannot confidently become `NORMAL`.
+
+Expected minimum:
+
+```text
+REVIEW
+```
+
+---
+
+# 30. Missing Telemetry
+
+A critical distinction must be preserved:
+
+```text
+Protect telemetry available and returned zero findings
+```
+
+is not the same as:
+
+```text
+Protect telemetry unavailable
+```
+
+Likewise for:
+
+```text
+MCP telemetry
+final output
+ACTION events
+```
+
+Retrieval failures must be represented as missing evidence.
+
+Do not convert missing telemetry into an empty, safe result.
+
+---
+
+# 31. Mock vs Live Mode
+
+The Guardian reasoning pipeline must not care where telemetry originated.
+
+```text
+Mock JSON
+      \
+       \
+        -> NormalizedTelemetry -> GuardianGraph
+       /
+      /
+Splunk
+```
+
+The only component that changes is telemetry acquisition.
+
+This allows mock scenarios to act as regression tests for the live security engine.
+
+---
+
+# 32. Instructions for Glean or an AI Coding Assistant Reading This Repository
+
+When assisting with this project:
+
+## Do
+
+- Preserve existing module boundaries.
+- Preserve Pydantic validation.
+- Preserve LangGraph parallel fan-out/fan-in.
+- Preserve deterministic security guardrails.
+- Preserve human approval for agent registration.
+- Preserve versioned behavioral baselines.
+- Treat unknown agents as unknown.
+- Treat missing evidence as missing.
+- Keep Demo #2 observational.
+- Maintain `enforcement_performed=false`.
+- Prefer small changes over architectural rewrites.
+- Validate changes using mock telemetry before live execution.
+
+## Do Not
+
+- Convert Guardian into a single monolithic LLM prompt.
+- Replace deterministic telemetry parsing with an LLM.
+- Replace deterministic disposition floors with LLM judgment.
+- Allow the onboarding LLM to authorize its own generated contract.
+- Automatically assume unknown actions are safe.
+- Automatically assume unavailable telemetry means zero findings.
+- Remove the Agent Registry.
+- Hard-code Guardian to the Five Sentence Document Reviewer.
+- Execute all five specialists sequentially without a technical reason.
+- Re-run the Guardian graph merely to display its output.
+- Add enforcement to Demo #2.
+
+---
+
+# 33. Important Glean Runtime Boundary
+
+Guardian is an external monitoring application.
+
+Glean is:
+
+```text
+the monitored AI platform
++
+the source of execution/security telemetry
+```
+
+Guardian Python code runs in a Python runtime, VM, container, workstation, or other suitable execution environment.
+
+Do not assume Glean itself must execute or compile the Guardian Python repository.
+
+The Glean Application ID identifies the application Guardian monitors.
+
+---
+
+# 34. Pre-Demo Checklist
+
+Before the live demonstration:
+
+```text
+[ ] Python 3.12 installed
+
+[ ] Virtual environment activated
+
+[ ] requirements.txt installed
+
+[ ] python -m compileall . succeeds
+
+[ ] Guardian LangGraph compilation succeeds
+
+[ ] LLM provider credential configured
+
+[ ] Five Sentence Document Reviewer created in Glean
+
+[ ] Real Glean Application ID entered in registry
+
+[ ] Splunk receives Glean WORKFLOW_RUN events
+
+[ ] Splunk ACTION correlation available
+
+[ ] MCP telemetry checked
+
+[ ] Glean Protect telemetry checked
+
+[ ] Mock normal scenario passes
+
+[ ] Mock unexpected document scenario passes
+
+[ ] Mock unexpected tool scenario passes
+
+[ ] Mock prompt-injection scenario passes
+
+[ ] Mock compound scenario passes
+
+[ ] LIVE_RUN_ONCE=true smoke test succeeds
+
+[ ] Output JSON appears in output/live/
+
+[ ] Run ledger appears in state/
+
+[ ] register_agent.py tested with a temporary application
+
+[ ] No real secrets committed to Git
+```
+
+---
+
+# 35. Live Demo Flow
+
+Recommended presentation:
+
+```text
+1. Run the Five Sentence Document Reviewer normally.
+
+2. Show Guardian observing the run.
+
+3. Show the five specialist analyses.
+
+4. Show final NORMAL disposition.
+
+5. Run or demonstrate anomalous behavior.
+
+6. Show Guardian produce REVIEW or ALERT.
+
+7. Ask someone in the room:
+
+       "Give me another Glean App ID."
+
+8. Run:
+
+       python register_agent.py
+
+9. Enter the App ID.
+
+10. Describe the application's intended behavior in plain English.
+
+11. Review Guardian's generated security contract.
+
+12. Approve registration.
+
+13. Run the new Glean application.
+
+14. Show Guardian automatically identify the newly registered application
+    and monitor it using its own behavioral baseline.
+```
+
+This demonstrates that Guardian is not a security script written specifically for one toy application.
+
+It is a reusable monitoring architecture for multiple live Glean agents.
+
+---
+
+# 36. Final Architectural Principle
+
+Guardian evaluates three questions:
+
+```text
+WHAT WAS REQUESTED?
+        |
+        v
+USER INTENT
+
+
+WHAT WAS ALLOWED?
+        |
+        v
+BEHAVIORAL BASELINE
+
+
+WHAT ACTUALLY HAPPENED?
+        |
+        v
+GLEan TELEMETRY
+```
+
+Guardian then asks:
+
+```text
+Did observed behavior remain consistent with
+the application's declared purpose and security contract?
+```
+
+That is the purpose of the Guardian Telemetry Swarm.
