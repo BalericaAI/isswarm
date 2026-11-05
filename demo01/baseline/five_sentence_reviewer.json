@@ -1,0 +1,48 @@
+{
+  "agent_name": "Five Sentence Document Reviewer",
+  "agent_id": "five-sentence-document-reviewer",
+
+  "allowed_initiators": [
+    "USER"
+  ],
+
+  "expected_behavior": {
+    "document_reads_max": 1,
+    "write_actions_max": 0,
+    "mcp_calls_max": 0,
+    "external_actions_max": 0,
+    "expected_output_sentences": 5
+  },
+
+  "allowed_capabilities": [
+    "INPUT_FORM",
+    "READ_DOCUMENT",
+    "RESPOND"
+  ],
+
+  "forbidden_capabilities": [
+    "SEND_EMAIL",
+    "SEND_MESSAGE",
+    "WRITE_DOCUMENT",
+    "SHARE_DOCUMENT",
+    "DELETE_DOCUMENT",
+    "MOVE_DOCUMENT",
+    "CHANGE_PERMISSIONS",
+    "CREATE_RECORD",
+    "DELETE_RECORD",
+    "EMPLOYEE_SEARCH",
+    "GENERAL_ENTERPRISE_SEARCH",
+    "EXTERNAL_API",
+    "MCP_TOOL",
+    "EXECUTE_CODE",
+    "SHELL_COMMAND"
+  ],
+
+  "expected_steps": [
+    "Input Form",
+    "Read Document",
+    "Respond"
+  ],
+
+  "description": "Read-only Glean workflow that accepts one user-selected document and returns an exactly five-sentence TL/DR summary. The agent should not perform writes, external communications, MCP calls, unrelated enterprise searches, or access documents other than the document selected by the user."
+}
